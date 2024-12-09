@@ -1,0 +1,52 @@
+@page "/cprcheck"
+@using Microsoft.EntityFrameworkCore
+@using SoftwareTest.ModelsTodo
+@using System.Security.Claims
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject TodoContext TodoDb
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Check if the user is authenticated
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            // Try to retrieve the user's ID from the NameIdentifier claim
+            var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Console.WriteLine($"[CPRCheck] Authenticated user. UserId: {userId}");
+
+            if (string.IsNullOrEmpty(userId))
+            {
+                // If no userId found, redirect to login
+                Console.WriteLine("[CPRCheck] No UserId claim found, redirecting to login.");
+                Navigation.NavigateTo("/Identity/Account/Login");
+                return;
+            }
+
+            // Check if a CPR entry exists for this user
+            var cprEntry = await TodoDb.Cprs.FirstOrDefaultAsync(c => c.User == userId); 
+            if (cprEntry == null)
+            {
+                // No CPR set yet → Force user to /cprsetup
+                Console.WriteLine("[CPRCheck] No CPR entry found, redirecting to cprsetup.");
+                Navigation.NavigateTo("/cprsetup");
+            }
+            else
+            {
+                // CPR already set → go to /cprverify
+                Console.WriteLine("[CPRCheck] CPR entry found, redirecting to cprverify.");
+                Navigation.NavigateTo("/cprverify");
+            }
+        }
+        else
+        {
+            // User not logged in → Redirect to login
+            Console.WriteLine("[CPRCheck] User not authenticated, redirecting to login.");
+            Navigation.NavigateTo("/Identity/Account/Login");
+        }
+    }
+}

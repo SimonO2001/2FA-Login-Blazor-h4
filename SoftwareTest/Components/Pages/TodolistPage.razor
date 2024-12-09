@@ -1,0 +1,187 @@
+@page "/todolist"
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+@using SoftwareTest.ModelsTodo
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthStateProvider
+@inject TodoContext TodoDb
+
+<h3 class="mt-4 mb-3 text-center">My Todo List</h3>
+
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+}
+
+@if (IsLoaded)
+{
+    <div class="container" style="max-width: 500px;">
+        <ul class="list-group mb-3">
+            @foreach (var item in TodoItems)
+            {
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>@item.Item</strong><br />
+                        <small class="text-muted">
+                            Created: @GetItemTime(item.Item).ToString("g")
+                        </small>
+                    </div>
+                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteItem(item.Item)">Delete</button>
+                </li>
+            }
+        </ul>
+
+        <div class="input-group mb-3">
+            <input @bind="NewItem" class="form-control" placeholder="Add new todo item..." />
+            <button class="btn btn-primary" @onclick="AddItem">Add</button>
+        </div>
+    </div>
+}
+else
+{
+    <p>Loading...</p>
+}
+
+@code {
+    private string? UserId;
+    private List<Todolist> TodoItems = new();
+    private string NewItem = string.Empty;
+    private string? ErrorMessage;
+    private bool IsLoaded = false;
+
+    // In-memory dictionary to store timestamps for each item
+    private Dictionary<string, DateTime> ItemTimestamps = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // 1. Check if authenticated
+        if (user.Identity?.IsAuthenticated != true)
+        {
+            Navigation.NavigateTo("/Identity/Account/Login");
+            return;
+        }
+
+        // 2. Get user ID from claim
+        UserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(UserId))
+        {
+            // No user ID found, go to login
+            Navigation.NavigateTo("/Identity/Account/Login");
+            return;
+        }
+
+        // 3. Check if CPR exists for this user
+        var cprEntry = await TodoDb.Cprs.FirstOrDefaultAsync(c => c.User == UserId);
+        if (cprEntry == null)
+        {
+            // No CPR set yet
+            Navigation.NavigateTo("/cprsetup");
+            return;
+        }
+
+        // 4. Force CPR Verification
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+
+        if (!query.AllKeys.Contains("verified") || query["verified"] != "true")
+        {
+            // Redirect to cprverify with a returnUrl
+            var returnUrl = "/todolist?verified=true";
+            Navigation.NavigateTo($"/cprverify?returnUrl={Uri.EscapeDataString(returnUrl)}");
+            return;
+        }
+
+        // If we reach here, user is authenticated, CPR is set, and verified is true.
+        await LoadTodoItems(cprEntry.CprNr);
+    }
+
+    private async Task LoadTodoItems(string cprNr)
+    {
+        TodoItems = await TodoDb.Todolists
+            .Where(t => t.UserId == cprNr)
+            .ToListAsync();
+
+        // Initialize timestamps for any items not already in dictionary
+        foreach (var item in TodoItems)
+        {
+            if (!ItemTimestamps.ContainsKey(item.Item))
+            {
+                // Assign a timestamp as now for existing items (Not ideal, but no stored date)
+                ItemTimestamps[item.Item] = DateTime.Now;
+            }
+        }
+
+        IsLoaded = true;
+    }
+
+    private async Task AddItem()
+    {
+        if (string.IsNullOrWhiteSpace(NewItem))
+        {
+            ErrorMessage = "Please enter a valid item.";
+            return;
+        }
+
+        // Find user's CPR again (just to be safe)
+        var cprEntry = await TodoDb.Cprs.FirstOrDefaultAsync(c => c.User == UserId);
+        if (cprEntry == null)
+        {
+            Navigation.NavigateTo("/cprsetup");
+            return;
+        }
+
+        // Add new item to Todolist
+        var todo = new Todolist
+        {
+            UserId = cprEntry.CprNr,
+            Item = NewItem
+        };
+
+        TodoDb.Todolists.Add(todo);
+        await TodoDb.SaveChangesAsync();
+
+        // Store the timestamp
+        ItemTimestamps[NewItem] = DateTime.Now;
+
+        NewItem = string.Empty;
+        await LoadTodoItems(cprEntry.CprNr);
+    }
+
+    private async Task DeleteItem(string itemName)
+    {
+        if (string.IsNullOrEmpty(itemName)) return;
+
+        // Confirm user still exists
+        var cprEntry = await TodoDb.Cprs.FirstOrDefaultAsync(c => c.User == UserId);
+        if (cprEntry == null)
+        {
+            Navigation.NavigateTo("/cprsetup");
+            return;
+        }
+
+        var todoItem = await TodoDb.Todolists.FirstOrDefaultAsync(t => t.UserId == cprEntry.CprNr && t.Item == itemName);
+        if (todoItem != null)
+        {
+            TodoDb.Todolists.Remove(todoItem);
+            await TodoDb.SaveChangesAsync();
+
+            // Remove from our local list and timestamps
+            ItemTimestamps.Remove(itemName);
+
+            // Refresh the list
+            await LoadTodoItems(cprEntry.CprNr);
+        }
+    }
+
+    private DateTime GetItemTime(string itemName)
+    {
+        if (ItemTimestamps.TryGetValue(itemName, out var time))
+        {
+            return time;
+        }
+        return DateTime.Now; // fallback, should not happen if logic is correct
+    }
+}

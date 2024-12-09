@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SoftwareTest.Components;
 using SoftwareTest.Components.Account;
 using SoftwareTest.Data;
+using SoftwareTest.ModelsTodo;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -55,7 +56,15 @@ builder.Services.AddAuthorization(options =>
     });
 });
 
+builder.Services.AddDbContext<TodoContext>(options =>
+    options.UseSqlServer(builder.Configuration.GetConnectionString("TodoConnection")));
+
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents()
+    .AddCircuitOptions(options => { options.DetailedErrors = true; });
+
 
 var app = builder.Build();
 

@@ -1,0 +1,64 @@
+@page "/cprverify"
+@using SoftwareTest.ModelsTodo
+@inject TodoContext TodoDb
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@using Microsoft.EntityFrameworkCore
+@using System.Security.Claims
+
+<h3>Verify Your CPR Number</h3>
+@if (!string.IsNullOrEmpty(ErrorMessage))
+{
+    <p style="color:red">@ErrorMessage</p>
+}
+<input @bind="EnteredCpr" placeholder="Enter CPR Number" />
+<button @onclick="VerifyCprAsync">Verify</button>
+
+@code {
+    private string EnteredCpr = string.Empty;
+    private string ErrorMessage = string.Empty;
+    private string? ReturnUrl; // Store the optional returnUrl
+
+    protected override void OnInitialized()
+    {
+        // Extract returnUrl from query string if present
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        ReturnUrl = query["returnUrl"];
+    }
+
+    private async Task VerifyCprAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Use the same claim type as in cprsetup and others
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            ErrorMessage = "You are not authenticated. Please log in first.";
+            return;
+        }
+
+        var cprEntry = await TodoDb.Cprs.FirstOrDefaultAsync(c => c.User == userId);
+
+        if (cprEntry != null && cprEntry.CprNr == EnteredCpr)
+        {
+            // CPR verified successfully
+            // If a returnUrl is provided, go there; otherwise go to "/"
+            if (!string.IsNullOrEmpty(ReturnUrl))
+            {
+                Navigation.NavigateTo(ReturnUrl);
+            }
+            else
+            {
+                Navigation.NavigateTo("/");
+            }
+        }
+        else
+        {
+            ErrorMessage = "CPR number incorrect. Try again.";
+        }
+    }
+}

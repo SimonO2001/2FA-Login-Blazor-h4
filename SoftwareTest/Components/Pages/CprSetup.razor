@@ -1,0 +1,51 @@
+@page "/cprsetup"
+@using SoftwareTest.ModelsTodo
+@using System.Security.Claims
+@inject TodoContext TodoDb
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<h3>Set Your CPR Number</h3>
+<input @bind="CprNumber" placeholder="Enter CPR Number" />
+<button @onclick="SaveCpr">Save</button>
+
+@code {
+    private string CprNumber = string.Empty;
+
+    private async Task SaveCpr()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        // Optional: Print out all claims to see what's available
+        foreach (var claim in user.Claims)
+        {
+            Console.WriteLine($"Type: {claim.Type}, Value: {claim.Value}");
+        }
+
+        // Try the NameIdentifier claim, which is commonly used by Identity for user IDs
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(userId))
+        {
+            // If userId is null or empty, the user is not properly authenticated or the claim isn't found.
+            // Redirect them to login or show an error message.
+            Console.WriteLine("User ID not found in claims. Please ensure you're logged in and that the claim exists.");
+            Navigation.NavigateTo("/Identity/Account/Login");
+            return;
+        }
+
+        // Now create and save the Cpr entry
+        var cpr = new Cpr
+        {
+            User = userId,   
+            CprNr = CprNumber
+        };
+
+        TodoDb.Cprs.Add(cpr);
+        await TodoDb.SaveChangesAsync();
+
+        // After saving, go to verify page
+        Navigation.NavigateTo("/cprverify");
+    }
+}
