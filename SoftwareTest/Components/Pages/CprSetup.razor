@@ -5,9 +5,17 @@
 @inject NavigationManager Navigation
 @inject SoftwareTest.Services.IHashingHandler HashingHandler
 
-<h3>Set Your CPR Number</h3>
-<input @bind="CprNumber" placeholder="Enter CPR Number" />
-<button @onclick="SaveCpr">Save</button>
+<AuthorizeView>
+    <Authorized>
+        <h3>Set Your CPR Number</h3>
+        <input @bind="CprNumber" placeholder="Enter CPR Number" />
+        <button @onclick="SaveCpr">Save</button>
+    </Authorized>
+    <NotAuthorized>
+        <p>You are not authorized to access this page. Please log in.</p>
+        <NavLink href="/Account/Login" class="btn btn-primary">Log In</NavLink>
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
     private string CprNumber = string.Empty;
@@ -22,7 +30,7 @@
         if (string.IsNullOrEmpty(userId))
         {
             Console.WriteLine("User ID not found in claims.");
-            Navigation.NavigateTo("/Identity/Account/Login");
+            Navigation.NavigateTo("/Account/Login");
             return;
         }
 

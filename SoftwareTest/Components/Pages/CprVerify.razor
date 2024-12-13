@@ -6,13 +6,21 @@
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 
-<h3>Verify Your CPR Number</h3>
-@if (!string.IsNullOrEmpty(ErrorMessage))
-{
-    <p style="color:red">@ErrorMessage</p>
-}
-<input @bind="EnteredCpr" placeholder="Enter CPR Number" />
-<button @onclick="VerifyCprAsync">Verify</button>
+<AuthorizeView>
+    <Authorized>
+        <h3>Verify Your CPR Number</h3>
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <p style="color:red">@ErrorMessage</p>
+        }
+        <input @bind="EnteredCpr" placeholder="Enter CPR Number" />
+        <button @onclick="VerifyCprAsync">Verify</button>
+    </Authorized>
+    <NotAuthorized>
+        <p>You are not authorized to access this page. Please log in.</p>
+        <NavLink href="/Account/Login" class="btn btn-primary">Log In</NavLink>
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
     private string EnteredCpr = string.Empty;

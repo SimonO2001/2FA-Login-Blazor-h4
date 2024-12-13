@@ -8,39 +8,49 @@
 @using SoftwareTest.Services
 @inject AsymmetricEncryptionHandler AsymmetricHandler
 
-<h3 class="mt-4 mb-3 text-center">My Todo List</h3>
+<AuthorizeView>
+    <Authorized>
+        <h3 class="mt-4 mb-3 text-center">My Todo List</h3>
 
-@if (!string.IsNullOrEmpty(ErrorMessage))
-{
-    <div class="alert alert-danger" role="alert">@ErrorMessage</div>
-}
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <div class="alert alert-danger" role="alert">@ErrorMessage</div>
+        }
 
-@if (IsLoaded)
-{
-    <div class="container" style="max-width: 500px;">
-        <ul class="list-group mb-3">
-            @foreach (var item in TodoItems)
-            {
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>@item.DecryptedItem</strong><br />
-                        <small class="text-muted">Created: @GetItemTime(item.Item).ToString("g")</small>
-                    </div>
-                    <button class="btn btn-sm btn-danger" @onclick="() => DeleteItem(item.Id)">Delete</button>
-                </li>
-            }
-        </ul>
+        @if (IsLoaded)
+        {
+            <div class="container" style="max-width: 500px;">
+                <ul class="list-group mb-3">
+                    @foreach (var item in TodoItems)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>@item.DecryptedItem</strong><br />
+                                <small class="text-muted">Created: @GetItemTime(item.Item).ToString("g")</small>
+                            </div>
+                            <button class="btn btn-sm btn-danger" @onclick="() => DeleteItem(item.Id)">Delete</button>
+                        </li>
+                    }
+                </ul>
 
-        <div class="input-group mb-3">
-            <input @bind="NewItem" class="form-control" placeholder="Add new todo item..." />
-            <button class="btn btn-primary" @onclick="AddItem">Add</button>
-        </div>
-    </div>
-}
-else
-{
-    <p>Loading...</p>
-}
+                <div class="input-group mb-3">
+                    <input @bind="NewItem" class="form-control" placeholder="Add new todo item..." />
+                    <button class="btn btn-primary" @onclick="AddItem">Add</button>
+                </div>
+            </div>
+        }
+        else
+        {
+            <p>Loading...</p>
+        }
+    </Authorized>
+
+    <NotAuthorized>
+        <h3>You are not authorized to access this page</h3>
+        <p>Please log in to manage your Todo List.</p>
+        <NavLink href="/Account/Login" class="btn btn-primary">Log In</NavLink>
+    </NotAuthorized>
+</AuthorizeView>
 
 @code {
     private string? UserId;
@@ -56,16 +66,16 @@ else
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        if (user.Identity?.IsAuthenticated != true)
+        if (!user.Identity?.IsAuthenticated ?? true)
         {
-            Navigation.NavigateTo("/Identity/Account/Login");
+            Navigation.NavigateTo("/Account/Login"); // Rettet redirect URL
             return;
         }
 
         UserId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (string.IsNullOrEmpty(UserId))
         {
-            Navigation.NavigateTo("/Identity/Account/Login");
+            Navigation.NavigateTo("/Account/Login"); // Rettet redirect URL
             return;
         }
 
@@ -73,16 +83,6 @@ else
         if (cprEntry == null)
         {
             Navigation.NavigateTo("/cprsetup");
-            return;
-        }
-
-        var uri = new Uri(Navigation.Uri);
-        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-
-        if (!query.AllKeys.Contains("verified") || query["verified"] != "true")
-        {
-            var returnUrl = "/todolist?verified=true";
-            Navigation.NavigateTo($"/cprverify?returnUrl={Uri.EscapeDataString(returnUrl)}");
             return;
         }
 
@@ -144,7 +144,6 @@ else
         NewItem = string.Empty;
         await LoadTodoItems(cprEntry.CprNr);
     }
-
 
     private async Task DeleteItem(int id)
     {
