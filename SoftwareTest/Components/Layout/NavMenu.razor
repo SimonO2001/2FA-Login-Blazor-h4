@@ -36,6 +36,20 @@
             </NavLink>
         </div>
 
+        <!-- Add CPR Setup Link -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="cprsetup">
+                <span class="bi bi-gear-fill-nav-menu" aria-hidden="true"></span> CPR Setup
+            </NavLink>
+        </div>
+
+        <!-- Add Todo List Link -->
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="todolist">
+                <span class="bi bi-list-check-nav-menu" aria-hidden="true"></span> Todo List
+            </NavLink>
+        </div>
+
         <AuthorizeView>
             <Authorized>
                 <div class="nav-item px-3">
@@ -89,4 +103,3 @@
         NavigationManager.LocationChanged -= OnLocationChanged;
     }
 }
-

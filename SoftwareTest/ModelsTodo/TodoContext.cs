@@ -37,12 +37,15 @@ public partial class TodoContext : DbContext
 
         modelBuilder.Entity<Todolist>(entity =>
         {
-            entity.HasKey(e => new { e.UserId, e.Item });
+            entity.HasKey(e => e.UserId); // Kun UserId som primær nøgle
+
+            entity.Property(e => e.Item)
+                .IsRequired()
+                .HasMaxLength(500); // Gør Item til en almindelig egenskab, stadig obligatorisk
 
             entity.ToTable("Todolist");
 
             entity.Property(e => e.UserId).HasMaxLength(500);
-            entity.Property(e => e.Item).HasMaxLength(500);
 
             entity.HasOne(d => d.User).WithMany(p => p.Todolists)
                 .HasForeignKey(d => d.UserId)

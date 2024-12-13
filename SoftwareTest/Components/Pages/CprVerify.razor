@@ -1,10 +1,10 @@
 @page "/cprverify"
+@using Microsoft.EntityFrameworkCore
 @using SoftwareTest.ModelsTodo
+@inject SoftwareTest.Services.IHashingHandler HashingHandler
 @inject TodoContext TodoDb
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
-@using Microsoft.EntityFrameworkCore
-@using System.Security.Claims
 
 <h3>Verify Your CPR Number</h3>
 @if (!string.IsNullOrEmpty(ErrorMessage))
@@ -25,6 +25,7 @@
         var uri = new Uri(Navigation.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
         ReturnUrl = query["returnUrl"];
+        Console.WriteLine($"ReturnUrl extracted: {ReturnUrl}");
     }
 
     private async Task VerifyCprAsync()
@@ -32,21 +33,27 @@
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
-        // Use the same claim type as in cprsetup and others
-        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrEmpty(userId))
         {
-            ErrorMessage = "You are not authenticated. Please log in first.";
+            ErrorMessage = "You are not authenticated. Please log in.";
             return;
         }
 
         var cprEntry = await TodoDb.Cprs.FirstOrDefaultAsync(c => c.User == userId);
-
-        if (cprEntry != null && cprEntry.CprNr == EnteredCpr)
+        if (cprEntry == null)
         {
-            // CPR verified successfully
-            // If a returnUrl is provided, go there; otherwise go to "/"
+            ErrorMessage = "CPR number not found.";
+            return;
+        }
+
+        var hashedInput = HashingHandler.SHAHashing(EnteredCpr);
+        Console.WriteLine($"Entered CPR: {EnteredCpr}, Hashed Input: {hashedInput}, Stored CPR: {cprEntry.CprNr}");
+
+        if (cprEntry.CprNr == hashedInput)
+        {
+            // Redirect to the return URL if provided; otherwise, go to the homepage
             if (!string.IsNullOrEmpty(ReturnUrl))
             {
                 Navigation.NavigateTo(ReturnUrl);
@@ -58,7 +65,7 @@
         }
         else
         {
-            ErrorMessage = "CPR number incorrect. Try again.";
+            ErrorMessage = "Incorrect CPR number.";
         }
     }
 }

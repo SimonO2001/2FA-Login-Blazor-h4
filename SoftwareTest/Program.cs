@@ -5,8 +5,33 @@ using SoftwareTest.Components;
 using SoftwareTest.Components.Account;
 using SoftwareTest.Data;
 using SoftwareTest.ModelsTodo;
+using SoftwareTest.Services;
+
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Retrieve the certificate password from environment variables
+var certPassword = builder.Configuration["CERT_PASSWORD"];
+if (string.IsNullOrEmpty(certPassword))
+{
+    throw new InvalidOperationException("Certificate password not found. Ensure CERT_PASSWORD environment variable is set.");
+}
+
+// Configure Kestrel to use HTTPS with the specified PFX certificate and password
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Listen on port 5001 with HTTPS
+    options.ListenAnyIP(5001, listenOptions =>
+    {
+        listenOptions.UseHttps("mycert.pfx", certPassword);
+    });
+});
+
+builder.Services.AddScoped<IHashingHandler, HashingHandler>();
+builder.Services.AddScoped<SymmetricEncryptionHandler>();
+builder.Services.AddScoped<AsymmetricEncryptionHandler>();
+
+
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -24,28 +49,31 @@ builder.Services.AddAuthentication(options =>
     })
     .AddIdentityCookies();
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
+    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 builder.Services.AddIdentityCore<ApplicationUser>(options =>
 {
-    // Sign-in indstillinger
+    // Sign-in settings
     options.SignIn.RequireConfirmedAccount = true;
 
-    // Passwordindstillinger
-    options.Password.RequireDigit = true; // Kræver mindst ét tal
-    options.Password.RequiredLength = 8; // Minimum 8 tegn
-    options.Password.RequireNonAlphanumeric = true; // Kræver mindst ét specialtegn
-    options.Password.RequireUppercase = true; // Kræver mindst ét stort bogstav
-    options.Password.RequireLowercase = true; // Kræver mindst ét lille bogstav
-    options.Password.RequiredUniqueChars = 1; // Kræver mindst ét unikt tegn
+    // Password settings
+    options.Password.RequireDigit = true;
+    options.Password.RequiredLength = 8;
+    options.Password.RequireNonAlphanumeric = true;
+    options.Password.RequireUppercase = true;
+    options.Password.RequireLowercase = true;
+    options.Password.RequiredUniqueChars = 1;
 })
 .AddRoles<IdentityRole>()
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddSignInManager()
 .AddDefaultTokenProviders();
+
 
 
 builder.Services.AddAuthorization(options =>
@@ -65,7 +93,6 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents()
     .AddCircuitOptions(options => { options.DetailedErrors = true; });
 
-
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -76,12 +103,10 @@ if (app.Environment.IsDevelopment())
 else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
 app.UseAntiforgery();
 

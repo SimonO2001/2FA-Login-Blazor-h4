@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.10" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.10" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.10" />
@@ -21,4 +22,8 @@
     </AssemblyAttribute>
   </ItemGroup>
   
+  <PropertyGroup>
+    <UserSecretsId>my-unique-secret-id-123</UserSecretsId>
+  </PropertyGroup>
+
 </Project>
